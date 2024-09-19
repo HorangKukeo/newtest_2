@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>랜덤 문제 풀기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        let currentQuestionIndex = 0; // 현재 문제의 인덱스
+        let totalQuestions = 10; // 랜덤으로 선택할 문제 수
+        let allQuestions = []; // 모든 문제 데이터를 저장할 전역 변수
+        let selectedQuestions = []; // 랜덤으로 선택된 문제들
+        let userAnswers = []; // 사용자가 선택한 답과 정답 여부 저장
+        let score = 0; // 점수 저장
+
+        // 문제 선택 처리 함수 (정답일 경우 점수 증가)
+        function selectAnswer(questionNumber, selectedAnswer, correctAnswer, uniqueId) {
+            const isCorrect = selectedAnswer === correctAnswer.toString() ? 'O' : 'X'; // 정답 비교
+
+            if (isCorrect === 'O') {
+                score++;  // 정답일 경우 점수 증가
+            }
+
+            userAnswers[questionNumber] = {
+                questionNumber: questionNumber + 1, // 문제 번호 1부터 시작
+                selectedAnswer: selectedAnswer,
+                correctAnswer: correctAnswer.toString(),
+                isCorrect: isCorrect,
+                uniqueId: uniqueId // 문제의 고유번호 추가
+            };
+        }
+
+
+        // 엑셀 파일을 불러와 처리하는 함수
+        async function loadExcelFile() {
+            try {
+                const response = await fetch('qdb.xlsx'); // 서버에서 엑셀 파일 불러오기
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                // 첫 번째 시트 데이터 가져오기
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                allQuestions = jsonData.slice(1); // 전체 문제 데이터 가져오기
+                selectedQuestions = getRandomQuestions(allQuestions, totalQuestions); // 문제 랜덤 선택
+
+                // 첫 번째 문제 출력
+                displayQuestion(currentQuestionIndex);
+            } catch (error) {
+                console.error("엑셀 파일을 불러오는 중 오류가 발생했습니다.", error);
+            }
+        }
+
+        // 문제를 랜덤으로 선택하는 함수
+        function getRandomQuestions(questions, numberOfQuestions) {
+            const shuffled = questions.sort(() => Math.random() - 0.5); // 문제를 섞음
+            return shuffled.slice(0, numberOfQuestions); // 섞은 문제 중 3개를 선택
+        }
+
+        // 문제를 출력하는 함수 (한 번에 한 문제만)
+        function displayQuestion(index) {
+            const questionContainer = document.getElementById('questions');
+            questionContainer.innerHTML = ''; // 기존 내용을 비움
+
+            const row = selectedQuestions[index]; // 현재 문제 데이터
+            const containerDiv = document.createElement('div');
+            containerDiv.classList.add('container');
+
+            // 발문 (문제)
+            const question = document.createElement('h3');
+            question.textContent = (index + 1) + ". " + row[0]; // 첫 번째 열에 문제
+            containerDiv.appendChild(question);
+
+            // <보기>, <보기 1>, <보기 2> 추가 (해당 부분이 있으면 출력)
+            const views = ['<보기>', '<보기 1>', '<보기 2>']; // 보기 제목
+            for (let i = 1; i <= 3; i++) {
+                if (row[i]) { // row[i]가 있을 경우에만 출력
+                    const viewTitle = document.createElement('p');
+                    viewTitle.textContent = views[i - 1]; // <보기>, <보기 1>, <보기 2> 출력
+
+                    const viewContent = document.createElement('p');
+                    viewContent.innerHTML = formatText(row[i]); // u()로 감싸진 텍스트 처리
+
+                    // 보기 내용 감싸기
+                    const viewContainer = document.createElement('div');
+                    viewContainer.classList.add('sub-container');
+                    viewContainer.appendChild(viewTitle);
+                    viewContainer.appendChild(viewContent);
+
+                    containerDiv.appendChild(viewContainer); // 보기 내용 전체 감싸기
+                }
+            }
+
+            // 선지(선택지) 추가
+            for (let i = 4; i <= 7; i++) {
+                const label = document.createElement('label');
+                const input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'q' + index; // 각 문제마다 고유 이름
+                input.value = i - 3;
+
+                label.appendChild(input);
+                label.appendChild(document.createTextNode(row[i]));
+                containerDiv.appendChild(label);
+                containerDiv.appendChild(document.createElement('br'));
+            }
+
+            questionContainer.appendChild(containerDiv);
+
+            // 버튼 추가
+            const button = document.createElement('button');
+            button.textContent = (index < totalQuestions - 1) ? "다음" : "채점하기";
+            button.onclick = (index < totalQuestions - 1) ? nextQuestion : checkAnswersAndDisplayResults;
+            questionContainer.appendChild(button);
+        }
+
+        function formatText(text) {
+            // u()로 감싸진 텍스트를 bold와 underline 처리
+            return text.replace(/u\((.*?)\)/g, '<b><u>$1</u></b>');
+        }
+
+
+        // 다음 문제로 이동하는 함수
+        function nextQuestion() {
+            const selectedAnswer = document.querySelector('input[name="q' + currentQuestionIndex + '"]:checked');
+            if (!selectedAnswer) {
+                alert("답을 선택하세요.");
+                return;
+            }
+
+            // 정답 및 고유번호 저장
+            const correctAnswer = selectedQuestions[currentQuestionIndex][8]; // 정답이 9번째 열에 위치
+            const uniqueId = selectedQuestions[currentQuestionIndex][10]; // 고유번호가 11번째 열에 위치
+
+            // 디버깅 로그 추가
+            console.log(`문제 ${currentQuestionIndex + 1}의 고유번호:`, uniqueId);
+
+            // 정답 및 고유번호 저장
+            selectAnswer(currentQuestionIndex, selectedAnswer.value, correctAnswer, uniqueId);
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < totalQuestions) {
+                displayQuestion(currentQuestionIndex); // 다음 문제 출력
+            } else {
+                checkAnswersAndDisplayResults(); // 마지막 문제에서는 결과를 출력
+            }
+        }
+
+
+        // 채점 및 결과 페이지 출력
+        function checkAnswersAndDisplayResults() {
+            const selectedAnswer = document.querySelector('input[name="q' + currentQuestionIndex + '"]:checked');
+            if (!selectedAnswer) {
+                alert("답을 선택하세요.");
+                return;
+            }
+
+            const correctAnswer = selectedQuestions[currentQuestionIndex][8]; // 정답이 9번째 열에 위치
+            const uniqueId = selectedQuestions[currentQuestionIndex][10]; // 고유번호가 11번째 열에 위치
+
+            // 디버깅용 로그
+            console.log('Selected Answer:', selectedAnswer.value);
+            console.log('Correct Answer:', correctAnswer);
+            console.log('Unique ID:', uniqueId);
+
+            // 데이터가 제대로 있는지 확인 후 정답 확인
+            if (correctAnswer && uniqueId) {
+                selectAnswer(currentQuestionIndex, selectedAnswer.value, correctAnswer, uniqueId); // 정답 및 고유번호 저장
+                displayResults(); // 결과 화면 출력
+                submitResults();  // 서버로 전송
+            } else {
+                console.error('정답 또는 고유번호가 없습니다.');
+            }
+        }
+
+
+        // 결과 페이지를 출력하는 함수
+        function displayResults() {
+            console.log('displayResults 함수 실행');
+
+            const questionContainer = document.getElementById('questions');
+            questionContainer.innerHTML = ''; // 기존 내용을 비움
+
+            selectedQuestions.forEach((row, index) => {
+                const containerDiv = document.createElement('div');
+                containerDiv.classList.add('container');
+
+                const question = document.createElement('h3');
+                question.textContent = (index + 1) + ". " + row[0];
+                containerDiv.appendChild(question);
+
+                // <보기>, <보기 1>, <보기 2> 추가 (해당 부분이 있으면 출력)
+                const views = ['<보기>', '<보기 1>', '<보기 2>'];
+                for (let i = 1; i <= 3; i++) {
+                    if (row[i]) {
+                        const viewTitle = document.createElement('p');
+                        viewTitle.textContent = views[i - 1]; // "<보기>", "<보기 1>", "<보기 2>"
+                        const viewContent = document.createElement('p');
+                        viewContent.innerHTML = formatText(row[i]); // u()로 감싸진 텍스트를 bold + underline 처리
+
+                        // 틀 안에 보기 내용 감싸기
+                        const viewContainer = document.createElement('div');
+                        viewContainer.classList.add('sub-container');
+                        viewContainer.appendChild(viewTitle);
+                        viewContainer.appendChild(viewContent);
+
+                        containerDiv.appendChild(viewContainer); // 보기 내용 추가
+                    }
+                }
+
+                const userAnswer = userAnswers[index]; // 사용자가 선택한 답
+                const correctAnswer = row[8]; // 정답 (9번째 열)
+
+                for (let i = 4; i <= 7; i++) {
+                    const answerText = document.createElement('p');
+                    answerText.textContent = row[i];
+
+                    if (i - 3 == correctAnswer) {
+                        answerText.style.color = 'green';
+                        answerText.style.fontWeight = 'bold';
+                    }
+
+                    if (userAnswer && userAnswer.selectedAnswer == (i - 3).toString()) {
+                        if (userAnswer.selectedAnswer !== correctAnswer.toString()) {
+                            answerText.style.color = 'red';
+                            answerText.style.fontWeight = 'bold';
+                        }
+                    }
+
+                    containerDiv.appendChild(answerText);
+                }
+
+                if (row[9]) {
+                    const explContainer = document.createElement('div');
+                    explContainer.classList.add('explcontainer');
+                    const explanation = document.createElement('p');
+                    explanation.textContent = "해설: " + row[9];
+                    explContainer.appendChild(explanation);
+                    containerDiv.appendChild(explContainer);
+                }
+
+                questionContainer.appendChild(containerDiv);
+            });
+
+            const scoreText = document.createElement('h3');
+            scoreText.textContent = "총 점수: " + score + "/" + totalQuestions;
+            questionContainer.appendChild(scoreText);
+
+            console.log('결과 출력 완료'); // 디버깅 로그 추가
+
+            // 다시 풀기 버튼
+            const resetButton = document.createElement('button');
+            resetButton.textContent = "다시 풀기";
+            resetButton.onclick = resetQuiz;
+            questionContainer.appendChild(resetButton); // 퀴즈 초기화 버튼 추가
+        }
+
+        function resetQuiz() {
+            currentQuestionIndex = 0;
+            userAnswers = []; // 사용자의 답 초기화
+            score = 0; // 점수 초기화
+            selectedQuestions = getRandomQuestions(allQuestions, totalQuestions); // 새롭게 문제를 랜덤으로 선택
+            displayQuestion(currentQuestionIndex); // 첫 번째 문제 출력
+        }
+
+
+
+        // 서버로 결과 전송
+        function submitResults() {
+            const studentName = sessionStorage.getItem('studentName');
+            const studentId = sessionStorage.getItem('studentId');
+
+            if (!studentName || !studentId) {
+                alert('학생 정보를 찾을 수 없습니다.');
+                return;
+            }
+
+            // 서버로 보낼 데이터 생성 (answers는 배열이므로 JSON.stringify로 문자열 변환)
+            const resultData = {
+                studentName: studentName,
+                studentId: studentId,
+                answers: JSON.stringify(userAnswers.map(answer => `(${answer.questionNumber}_${answer.uniqueId})${answer.selectedAnswer}${answer.isCorrect}`)),
+                score: `${score}/${userAnswers.length}`
+            };
+
+            // 서버로 데이터 전송
+            fetch('https://horangtest2.glitch.me/saveResults', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(resultData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => {
+                console.error('데이터 전송 중 오류 발생:', error);
+            });
+        }
+
+
+
+        // 페이지 로딩 시 자동으로 엑셀 파일 불러오기
+        window.onload = loadExcelFile;
+    </script>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: auto;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            margin: 0 auto; /* 수평 중앙 정렬 */
+            margin-bottom: 50px !important;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 90%; /* 모바일 환경에서는 최대 90% 너비 사용 */
+            max-width: 400px; /* 최대 너비 설정 */
+            text-align: left;
+            box-sizing: border-box; /* padding과 border를 포함한 크기 계산 */
+        }
+
+        .sub-container {
+            background-color: #f9f9f9; /* 보기 항목 배경색 */
+            padding: 10px;
+            margin: 15px 0; /* 보기 사이 여백 */
+            border-radius: 6px;
+            border: 1px solid #ddd; /* 보기 항목 구분을 위한 테두리 */
+        }
+        .explcontainer {
+            background-color: #f0f8ff; /* 해설 부분의 배경색 */
+            padding: 10px; /* 내부 여백 */
+            margin-top: 15px; /* 위쪽 여백 */
+            border-left: 4px solid #4CAF50; /* 좌측에 녹색 선 추가 */
+            border-radius: 6px; /* 둥근 테두리 */
+            font-size: 14px; /* 글자 크기 */
+            color: #333; /* 글자 색상 */
+        }   
+        h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        label {
+        display: block;
+        background-color: #e6f7ff;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        }
+        label:hover {
+            background-color: #b3e0ff;
+        }
+        input[type="radio"] {
+            margin-right: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body> <h1>랜덤 문제 풀기</h1>
+    <!-- 문제와 선택지가 표시될 영역 -->
+<div id="questions"></div>
+</body>
+</html>

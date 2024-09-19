@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학생 정보 입력</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .form-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 300px;
+        }
+        input[type="text"] {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>학생 정보 입력</h2>
+        <form id="studentForm">
+            <input type="text" id="studentName" placeholder="이름" required>
+            <input type="text" id="studentId" placeholder="고유번호" required>
+            <button type="submit">문제 풀기 시작</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('studentForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // 기본 제출 방지
+      // 폼 제출 시 서버로 데이터를 전송
+            // 학생 이름과 고유번호 가져오기
+            const studentName = document.getElementById('studentName').value;
+            const studentId = document.getElementById('studentId').value;
+
+            // 세션 스토리지에 학생 정보 저장
+            sessionStorage.setItem('studentName', studentName);
+            sessionStorage.setItem('studentId', studentId);
+
+                    setTimeout(() => {
+                        window.location.href = '1.html'; // 문제 풀이 화면으로 이동
+                    }, 500); // 500ms 딜레이
+                
+                })
+    </script>
+</body>
+</html>
